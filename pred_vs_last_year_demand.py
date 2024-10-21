@@ -206,6 +206,13 @@ def get_forecast_accuracy_schema(acc_final_data, data_mapping_accuracy_segmentat
         rules_values = '_'.join(rules_values)
         print(rules_values)
         final_data = get_data_from_rules(acc_final_data, rules_values, 'forecast_accuracy')
+        final_data['Revision_Sales_'] = final_data['Revision_Sales']
+        final_data['actual_demand_'] = final_data['actual_demand']
+        final_data['Predicted_'] = final_data['Predicted']
+        final_data['Revision_Sales'] = final_data['Revision_Sales'] * final_data['NetWeight_calculated']
+        final_data['actual_demand'] = final_data['actual_demand'] * final_data['NetWeight_calculated']
+        final_data['Predicted'] = final_data['Predicted'] * final_data['NetWeight_calculated']
+
         for j in ['H1', "Channel"]:
             # print(j,filters[j])
             c = generate_condition(final_data, j, filters[j])
@@ -214,8 +221,9 @@ def get_forecast_accuracy_schema(acc_final_data, data_mapping_accuracy_segmentat
             continue
         # print(final_data.shape)
         temp_group = final_data.groupby(['year_month'])[['Predicted', 'actual_demand']].sum()
-        temp_group["mape"] = np.abs(temp_group['Predicted'] - temp_group['actual_demand']) / temp_group[
-            'actual_demand']
+        temp_group["mape"] = (np.abs(temp_group['Predicted']
+                                     - temp_group['actual_demand']) /
+                              (temp_group['actual_demand']))
         # temp_group['mape']=temp_group['mape'].astype(int)
         temp_group.reset_index(inplace=True)
         temp_group["h1"] = filters['H1']
@@ -297,7 +305,8 @@ def get_confusion_matrix_schema(acc_final_data, data_mapping_accuracy_segmentati
                     # print((c1&c2).sum())
                     data_collect['Actual Sales'].append(j)
                     data_collect['Predicted Sales'].append(i)
-                    data_collect['No of SKUS'].append((c1 & c2).sum())
+                    # data_collect['No of SKUS'].append((c1 & c2).sum())
+                    data_collect['No of SKUS'].append(t[c1 & c2]['sku'].nunique())
                     data_collect['year_month'].append(k)
         d = pd.DataFrame(data_collect)
         # display(pd.DataFrame(data_collect_))
@@ -309,9 +318,9 @@ def get_confusion_matrix_schema(acc_final_data, data_mapping_accuracy_segmentati
         d['Channel'] = filters["Channel"]
         d['Total'] = filters["Total"]
         d['Statistical'] = filters["Statistical"]
-        c = d['Actual Sales'] != 0
-        c1 = d['Predicted Sales'] != 0
-        d = d[c | c1]
+        # c = d['Actual Sales'] != 0
+        # c1 = d['Predicted Sales'] != 0
+        # d = d[c | c1]
         confusion_matrix_schema = pd.concat([confusion_matrix_schema, d], axis=0)
 
     return confusion_matrix_schema
@@ -436,6 +445,7 @@ def get_sku_demand_page_schema(acc_final_data, data_mapping_sku_demand_page, sku
 
     return sku_demand_page_schema
 
+
 def get_sku_demand_page_schema_(acc_final_data, data_mapping_sku_demand_page, sku_details, input_data_c, current_date):
     sku_demand_page_schema = pd.DataFrame()
     for i in tqdm(range(data_mapping_sku_demand_page.shape[0])):
@@ -499,7 +509,7 @@ def get_sku_demand_page_schema_(acc_final_data, data_mapping_sku_demand_page, sk
     return sku_demand_page_schema
 
 
-def generate_variability_index(input_data_c,current_date):
+def generate_variability_index(input_data_c, current_date):
     dict_ = {
         "sku": [],
         "H1": [],
@@ -529,7 +539,10 @@ def generate_variability_index(input_data_c,current_date):
             if input_data_.shape[0] == 0:
                 continue
             print("MAKING_DATA _CONTINOUS")
-            input_data = make_data_continous_(input_data_, 'sku', current_date, 6)
+            input_data_['date']=pd.to_datetime(input_data_['year_month']+"-01")
+            input_data_.sort_values(['sku','date'],inplace=True)
+            # input_data = make_data_continous_(input_data_, 'sku', current_date, 6)
+            input_data = input_data_.copy()
             input_data['TOTAL_QTY_BASEUOM_SUM'].fillna(0, inplace=True)
             for sku in tqdm(input_data_['sku'].unique()):
                 dict_['sku'].append(sku)
@@ -539,7 +552,7 @@ def generate_variability_index(input_data_c,current_date):
                 #             print(input_data[c].shape)
                 variability = input_data_[c]['TOTAL_QTY_BASEUOM_SUM'].std() / input_data_[c][
                     'TOTAL_QTY_BASEUOM_SUM'].mean()
-                print(variability, 'printing variability')
+                # print(variability, 'printing variability')
                 dict_['Variability'].append(variability)
                 dict_['Standard_Dev'].append(input_data_[c]['TOTAL_QTY_BASEUOM_SUM'].std())
     return pd.DataFrame(dict_)
@@ -575,6 +588,7 @@ def generate_variability_schema(variability_data):
             variability_index = pd.concat([variability_index, temp], axis=0)
 
     return variability_index
+
 
 def get_sku_demand_page_schema_1(acc_final_data, data_mapping_sku_demand_page, sku_details, input_data_c, current_date):
     sku_demand_page_schema = pd.DataFrame()

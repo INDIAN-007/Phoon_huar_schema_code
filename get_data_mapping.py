@@ -68,6 +68,22 @@ def get_data_mapping_confusion_matrix(final_file_schema_1):
     return data_mapping_1
 
 
+def get_data_mapping_sku_demand_page_(final_file_schema_1):
+    # Main datA Mapping
+    data_mapping_1 = pd.DataFrame()
+    categories = list(final_file_schema_1['H1'].unique())
+    channels = list(final_file_schema_1['Channel'].unique())
+    for i in tqdm(categories):
+        for j in tqdm(channels):
+            b = np.array([[1, 0], [0, 1]])
+            a = np.array([[i] * 2, [j] * 2,]).T
+            combination = pd.DataFrame(np.hstack([a, b]),
+                                       columns=['H1', 'Channel', "Statistical", "Total"])
+            data_mapping_1 = pd.concat([data_mapping_1, combination], axis=0)
+    data_mapping_1.reset_index(drop=True, inplace=True)
+    return data_mapping_1
+
+
 def get_data_mapping_sku_demand_page(final_file_schema_1):
     # Main datA Mapping
     data_mapping_1 = pd.DataFrame()
