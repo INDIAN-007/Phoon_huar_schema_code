@@ -26,6 +26,39 @@ def make_input_data_continous(input_data, current_date):
     return input_data_c
 
 
+
+def make_input_data_continous_new(input_data, current_date):
+    # Setting Date Ranges
+    max_horizon=6
+    # current_year_month = str((current_date + pd.DateOffset(months=1)).date())[:-3]
+    current_year_month=str(((current_date+pd.DateOffset(months=1))+
+                            pd.DateOffset(months=max_horizon)).date())[:-3]
+    date_ranges = np.arange('2018-07', current_year_month, dtype='datetime64[M]')
+    # Adding the date range into a dummy
+    group_dict = {'group': [1], 'date': [date_ranges]}
+    group_dict = pd.DataFrame(group_dict)
+    # GEtting unique MATERIAL Channel & Category
+    unique_skus = input_data[['MATERIAL', 'CHNL_NAME', 'H1']]
+    input_data_cc = pd.DataFrame()
+    input_data_cc = unique_skus.drop_duplicates().copy()
+    input_data_cc['group'] = 1
+    input_data_cc = pd.merge(input_data_cc, group_dict, on=['group'], how='left')
+    input_data_cc = input_data_cc.explode(column='date')
+    input_data['date'] = pd.to_datetime(input_data['year_month'] + "-01")
+    min_input_date_ = input_data.groupby(['MATERIAL', "CHNL_NAME"], as_index=False)['date'].min().rename(
+        columns={'date': 'min_date'})
+    input_data_cc = pd.merge(input_data_cc, min_input_date_, on=['MATERIAL', 'CHNL_NAME'], how='left')
+    c = input_data_cc['date'] >= input_data_cc['min_date']
+    input_data_cc = input_data_cc[c]
+    input_data_c = pd.merge(input_data_cc, input_data.drop('H1', axis=1), on=['MATERIAL', 'date', 'CHNL_NAME'],
+                            how='left')
+    input_data_c.head()
+    input_data_c['year_month'] = input_data_c['date'].astype(str).str[:-3]
+    input_data_c.fillna(0, inplace=True)
+    input_data_c.drop(['group', 'min_date'], axis=1, inplace=True)
+    return input_data_c
+
+
 def collect_data(path, files, col=None):
     d = pd.DataFrame()
     for i in files:
@@ -44,7 +77,8 @@ def generate_condition(df, col_name, col_value):
         else:
             return df[col_name] == col_value
     except:
-        print(col_name,col_value,'FROM EXCEPTION')
+        print(col_name, col_value, 'FROM EXCEPTION')
+
 
 def make_data_continous(df, groupby_col, current_date, max_horizon):
     df['date'] = pd.to_datetime(df['year_month'] + "-01")
@@ -99,6 +133,7 @@ def make_data_continous(df, group_by_col, current_date, max_horizon):
         data_ = pd.concat([data_, data], axis=0)
     return data_
 
+
 def make_data_continous_(df, group_by_col, current_date, max_horizon):
     df['date'] = pd.to_datetime(df['year_month'] + "-01")
     data_ = pd.DataFrame()
@@ -116,6 +151,7 @@ def make_data_continous_(df, group_by_col, current_date, max_horizon):
         # data['SALES_SUM'].fillna(0, inplace=True)
         data_ = pd.concat([data_, data], axis=0)
     return data_
+
 
 def load_filters_old(limits, cols, data):
     condition_list = []
@@ -174,8 +210,8 @@ def load_filters(limits, cols, data):
             condi = (data[cols] > i)
             condition_list.append(condi)
 
-    return np.select(condition_list, choice_list),choice_list
+    return np.select(condition_list, choice_list), choice_list
 
 
 def round_to_100(num):
-    return ((num+10)//10)*10
+    return ((num + 10) // 10) * 10
